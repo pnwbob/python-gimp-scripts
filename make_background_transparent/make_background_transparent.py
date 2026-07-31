@@ -26,7 +26,7 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     # "RGBA u8" tells Babl exactly how to fill the byte array
     pixel_data = buffer.get(rect, 1.0, "RGBA u8", Gegl.AbyssPolicy.CLAMP)
 
-    # 1. Safe guard check to ensure data was actually read from the canvas
+    # 4. Safe guard check to ensure data was actually read from the canvas
     if pixel_data and len(pixel_data) >= 3:
         r = pixel_data[0] / 255.0
         g = pixel_data[1] / 255.0
@@ -34,18 +34,20 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     else:
         r = g = b = 1.0  # Default fallback if read failed
 
-    # 2. Correctly initialize the Gegl.Color object using a valid base string string
+    # 5. Correctly initialize the Gegl.Color object using a valid base string string
     color = Gegl.Color.new("black")
 
-    # 3. Explicitly overwrite the RGBA components with your extracted floats
+    # 6. Explicitly overwrite the RGBA components with your extracted floats
     color.set_rgba(r, g, b, 1.0)
 
     
-    # 6. Perform the Select by Color operation using the modern Gimp Image API
+    # 7. Perform the Select by Color operation using the modern Gimp Image API
     # Gimp.ChannelOps.REPLACE (value 2) replaces any active selection
     image.select_color(Gimp.ChannelOps.REPLACE, drawable, color)
+
+    Gimp.Selection.grow(image, 1)  # Grow selection by 1 pixel to ensure edges are included
     
-    # 7. Flush displays to make the selection visible on canvas
+    # 8. Flush displays to make the selection visible on canvas
     Gimp.displays_flush()
     
     return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
