@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "C:/Program Files/GIMP 3/bin/python.exe",
+    "python.analysis.extraPaths": [
+        "C:/Program Files/GIMP 3/lib/python3.14/site-packages",
+        "C:/Program Files/GIMP 3/lib/python3.14"
+    ]
+}
