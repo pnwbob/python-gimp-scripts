@@ -19,38 +19,42 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     # 1. Get the GEGL buffer of the drawable
     buffer = drawable.get_buffer()
     
-    # 1. Define the 1x1 target region
+    # 2. Define the 1x1 target region
     rect = Gegl.Rectangle.new(0, 0, 1, 1)
 
-    # 2. Force GEGL to output standard 8-bit RGBA bytes using Babl formatting
+    # 3. Force GEGL to output standard 8-bit RGBA bytes using Babl formatting
     # "RGBA u8" tells Babl exactly how to fill the byte array
     pixel_data = buffer.get(rect, 1.0, "RGBA u8", Gegl.AbyssPolicy.CLAMP)
 
-    # 3. Safe guard check to ensure data was actually read from the canvas
+    # 1. Safe guard check to ensure data was actually read from the canvas
     if pixel_data and len(pixel_data) >= 3:
         r = pixel_data[0] / 255.0
         g = pixel_data[1] / 255.0
         b = pixel_data[2] / 255.0
     else:
-        # Safe fallback values (defaults to pure white if read fails)
-        r = g = b = 1.0
-    
-    # 3. Create a GeglColor object from the retrieved RGBA bytes
-    color = Gegl.Color.new("rgb")
-    # Convert first 3 bytes (R, G, B) to floats between 0.0 and 1.0
-    r, g, b = pixel_data[0]/255.0, pixel_data[1]/255.0, pixel_data[2]/255.0
+        r = g = b = 1.0  # Default fallback if read failed
+
+    # 2. Correctly initialize the Gegl.Color object using a valid base string string
+    color = Gegl.Color.new("black")
+
+    # 3. Explicitly overwrite the RGBA components with your extracted floats
     color.set_rgba(r, g, b, 1.0)
+
     
-    # 4. Perform the Select by Color operation using the modern Gimp Image API
+    # 6. Perform the Select by Color operation using the modern Gimp Image API
     # Gimp.ChannelOps.REPLACE (value 2) replaces any active selection
     image.select_color(Gimp.ChannelOps.REPLACE, drawable, color)
     
-    # 5. Flush displays to make the selection visible on canvas
+    # 7. Flush displays to make the selection visible on canvas
     Gimp.displays_flush()
     
     return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
 
 class MakeBackTransPlugin(Gimp.PlugIn):
+    # Override this method to tell GIMP 3.2 to stop looking for translation files
+    def do_set_i18n(self, procname):
+        return (False, None, None)
+    
     def do_query_procedures(self):
         return ["python-fu-make-background-transparent"]
 
