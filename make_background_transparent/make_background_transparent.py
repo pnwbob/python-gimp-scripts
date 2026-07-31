@@ -10,19 +10,45 @@ gi.require_version('Gegl', '0.4')
 
 from gi.repository import Gimp, GimpUi, Gegl, GObject, Gio, GLib
 
-def create_make_background_transparent_image():
-    """Core image creation logic."""
-    image = Gimp.Image.new(600, 400, Gimp.ImageBaseType.RGB)
-    bg = Gimp.Layer.new(image, "BG", 600, 400, Gimp.ImageType.RGB_IMAGE, 100, Gimp.LayerMode.NORMAL)
-    image.insert_layer(bg, None, 0)
+def create_make_background_transparent_image(procedure, run_mode, image, n_drawables, drawables, config, data):
+    if n_drawables == 0:
+        return procedure.new_return_values(Gimp.PdbStatusType.EXECUTION_ERROR, GLib.Error.new_literal(Gio.io_error_quark(), Gio.IOErrorEnum.INVALID_ARGUMENT, "No drawables provided."))
 
-    # Grab the active system font automatically
-    active_font = Gimp.context_get_font()
-    # Create the text layer safely
-    text = Gimp.TextLayer.new(image, "Make Background Transparent!", active_font, 40, Gimp.Unit.pixel())
+    drawable = drawables[0]
 
-    image.insert_layer(text, None, 0)
-    Gimp.Display.new(image)
+    # 1. Get the GEGL buffer of the drawable
+    buffer = drawable.get_buffer()
+    
+    # 1. Define the 1x1 target region
+    rect = Gegl.Rectangle.new(0, 0, 1, 1)
+
+    # 2. Force GEGL to output standard 8-bit RGBA bytes using Babl formatting
+    # "RGBA u8" tells Babl exactly how to fill the byte array
+    pixel_data = buffer.get(rect, 1.0, "RGBA u8", Gegl.AbyssPolicy.CLAMP)
+
+    # 3. Safe guard check to ensure data was actually read from the canvas
+    if pixel_data and len(pixel_data) >= 3:
+        r = pixel_data[0] / 255.0
+        g = pixel_data[1] / 255.0
+        b = pixel_data[2] / 255.0
+    else:
+        # Safe fallback values (defaults to pure white if read fails)
+        r = g = b = 1.0
+    
+    # 3. Create a GeglColor object from the retrieved RGBA bytes
+    color = Gegl.Color.new("rgb")
+    # Convert first 3 bytes (R, G, B) to floats between 0.0 and 1.0
+    r, g, b = pixel_data[0]/255.0, pixel_data[1]/255.0, pixel_data[2]/255.0
+    color.set_rgba(r, g, b, 1.0)
+    
+    # 4. Perform the Select by Color operation using the modern Gimp Image API
+    # Gimp.ChannelOps.REPLACE (value 2) replaces any active selection
+    image.select_color(Gimp.ChannelOps.REPLACE, drawable, color)
+    
+    # 5. Flush displays to make the selection visible on canvas
+    Gimp.displays_flush()
+    
+    return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
 
 class MakeBackTransPlugin(Gimp.PlugIn):
     def do_query_procedures(self):
@@ -35,7 +61,7 @@ class MakeBackTransPlugin(Gimp.PlugIn):
         return proc
 
     def run(self, procedure, run_mode, image, drawables, config, data):
-        create_make_background_transparent_image()
-        return procedure.new_return_values(Gimp.PdbStatusType.SUCCESS, None)
+        create_make_background_transparent_image(procedure, run_mode, image, len(drawables), drawables, config, data)
+        return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, None)
 
 Gimp.main(MakeBackTransPlugin.__gtype__, sys.argv)
