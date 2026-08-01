@@ -46,6 +46,33 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     image.select_color(Gimp.ChannelOps.REPLACE, drawable, color)
 
     Gimp.Selection.grow(image, 1)  # Grow selection by 1 pixel to ensure edges are included
+
+    # 2. Check if an active selection exists on the canvas.
+    # If no selection is active, GIMP defaults to applying filters to the whole layer.
+    is_empty = Gimp.Selection.is_empty(image)
+    if is_empty:
+        print("Warning: No active selection found. Filter will apply to the entire layer.")
+
+    # 3. Color to Alpha requires an explicit transparency map.
+    # Add an alpha channel if the source layer does not have one (e.g., flat JPEGs)
+    if not drawable.has_alpha():
+        drawable.add_alpha()
+
+    # 4. Instantiate the modern non-destructive GIMP 3 filter via GEGL
+    # Operation ID: "gegl:color-to-alpha"
+    c2alpha_filter = Gimp.DrawableFilter.new(drawable, "gegl:color-to-alpha", "Selection Color to Alpha")
+    
+    # 5. Extract the internal configuration map to inject the color data
+    filter_config = c2alpha_filter.get_config()
+    
+    # 6. Set properties. "color" expects a valid Gegl.Color object
+    filter_config.set_property("color", color)
+    filter_config.set_property("transparency-threshold", 0.0) # Matches default tool behavior
+    filter_config.set_property("opacity-threshold", 1.0)       # Matches default tool behavior
+    
+    # 7. Execute, commit, and merge the filter data onto the drawable canvas matrix.
+    # GIMP automatically restricts this operation to the boundaries of the selection.
+    drawable.merge_filter(c2alpha_filter)    
     
     # 8. Flush displays to make the selection visible on canvas
     Gimp.displays_flush()
