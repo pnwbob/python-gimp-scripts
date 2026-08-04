@@ -3,12 +3,11 @@ import sys
 import gi
 # GIMP core elements use 3.0 API bindings
 gi.require_version('Gimp', '3.0')
-gi.require_version('GimpUi', '3.0')
 
 # GEGL components use 0.4 API bindings
 gi.require_version('Gegl', '0.4')
 
-from gi.repository import Gimp, GimpUi, Gegl, GObject, Gio, GLib
+from gi.repository import Gimp, Gegl, Gio, GLib
 
 def create_make_background_transparent_image(procedure, run_mode, image, n_drawables, drawables, config, data):
     if n_drawables == 0:
