@@ -71,9 +71,12 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     
     # 7. Execute, commit, and merge the filter data onto the drawable canvas matrix.
     # GIMP automatically restricts this operation to the boundaries of the selection.
-    drawable.merge_filter(c2alpha_filter)    
+    drawable.merge_filter(c2alpha_filter)
+
+    # 8. Clear the selection after applying the filter to avoid leaving an active selection on the canvas
+    Gimp.Selection.none(image)
     
-    # 8. Flush displays to make the selection visible on canvas
+    # 9. Flush displays to make the selection visible on canvas
     Gimp.displays_flush()
     
     return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
