@@ -96,7 +96,16 @@ class MakeBackTransPlugin(Gimp.PlugIn):
         return proc
 
     def run(self, procedure, run_mode, image, drawables, config, data):
-        create_make_background_transparent_image(procedure, run_mode, image, len(drawables), drawables, config, data)
-        return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, None)
+        try:
+            create_make_background_transparent_image(procedure, run_mode, image, len(drawables), drawables, config, data)
+            
+            # CORRECT: Passes an empty GLib Error structure for a successful run
+            return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
+            
+        except Exception as e:
+            # BONUS SAFETY: Prevents crashing if your background transparency function fails internally
+            Gimp.message(f"Plugin failed: {str(e)}")
+            return procedure.new_return_values(Gimp.PDBStatusType.EXECUTION_ERROR, GLib.Error())
+
 
 Gimp.main(MakeBackTransPlugin.__gtype__, sys.argv)
