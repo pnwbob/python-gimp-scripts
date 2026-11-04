@@ -39,7 +39,9 @@ def _choose_color(initial_color):
     picker.set_show_alpha(False)
 
     dialog.get_content_area().pack_start(picker, True, True, 12)
+    dialog.set_keep_above(True)
     dialog.show_all()
+    dialog.present()
 
     response = dialog.run()
     chosen_color = picker.get_color() if response == Gtk.ResponseType.OK else None
