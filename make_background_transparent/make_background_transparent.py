@@ -7,11 +7,55 @@ gi.require_version('Gimp', '3.0')
 # GEGL components use 0.4 API bindings
 gi.require_version('Gegl', '0.4')
 
-from gi.repository import Gimp, Gegl, Gio, GLib
+from gi.repository import Gimp, Gegl, Gio, GLib, Gdk, Gtk, GimpUi
+
+def _alt_is_held():
+    """Best-effort check of the modifier state when the plug-in starts."""
+    print("Checking if Alt key is held down...")
+    root = Gdk.get_default_root_window()
+    display = Gdk.Display.get_default()
+
+    if root is None or display is None:
+        return False
+
+    pointer = display.get_default_seat().get_pointer()
+    _window, _x, _y, modifiers = root.get_device_position(pointer)
+    return bool(modifiers & Gdk.ModifierType.MOD1_MASK)
+
+
+def _choose_color(initial_color):
+    """Return the chosen Gegl.Color, or None if the user cancels."""
+    print("Opening color selection dialog...")
+    dialog = Gtk.Dialog(title="Choose color to make transparent")
+    dialog.add_buttons(
+        "_Cancel", Gtk.ResponseType.CANCEL,
+        "_OK", Gtk.ResponseType.OK
+    )
+    dialog.set_default_response(Gtk.ResponseType.OK)
+
+    picker = GimpUi.ColorSelection.new()
+    picker.set_color(initial_color)
+    picker.set_old_color(initial_color)
+    picker.set_show_alpha(False)
+
+    dialog.get_content_area().pack_start(picker, True, True, 12)
+    dialog.show_all()
+
+    response = dialog.run()
+    chosen_color = picker.get_color() if response == Gtk.ResponseType.OK else None
+    dialog.destroy()
+    return chosen_color
 
 def create_make_background_transparent_image(procedure, run_mode, image, n_drawables, drawables, config, data):
+    print("Running - 'Make Background Transparent' plugin...")
     if n_drawables == 0:
-        return procedure.new_return_values(Gimp.PdbStatusType.EXECUTION_ERROR, GLib.Error.new_literal(Gio.io_error_quark(), Gio.IOErrorEnum.INVALID_ARGUMENT, "No drawables provided."))
+        return procedure.new_return_values(
+            Gimp.PdbStatusType.EXECUTION_ERROR,
+            GLib.Error.new_literal(Gio.io_error_quark(),
+            Gio.IOErrorEnum.INVALID_ARGUMENT,
+            "No drawables provided."
+        )
+    )
 
     drawable = drawables[0]
 
@@ -39,7 +83,17 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     # 6. Explicitly overwrite the RGBA components with your extracted floats
     color.set_rgba(r, g, b, 1.0)
 
-    
+    # Alt: let the user override that color before processing.
+    if run_mode == Gimp.RunMode.INTERACTIVE:
+        GimpUi.init("make-background-transparent")
+
+        if _alt_is_held():
+            color = _choose_color(color)
+            if color is None:
+                return procedure.new_return_values(
+                    Gimp.PdbStatusType.CANCEL, GLib.Error()
+                )
+
     # 7. Perform the Select by Color operation using the modern Gimp Image API
     # Gimp.ChannelOps.REPLACE (value 2) replaces any active selection
     image.select_color(Gimp.ChannelOps.REPLACE, drawable, color)
@@ -48,8 +102,7 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
 
     # 2. Check if an active selection exists on the canvas.
     # If no selection is active, GIMP defaults to applying filters to the whole layer.
-    is_empty = Gimp.Selection.is_empty(image)
-    if is_empty:
+    if Gimp.Selection.is_empty(image):
         print("Warning: No active selection found. Filter will apply to the entire layer.")
 
     # 3. Color to Alpha requires an explicit transparency map.
@@ -78,7 +131,9 @@ def create_make_background_transparent_image(procedure, run_mode, image, n_drawa
     
     # 9. Flush displays to make the selection visible on canvas
     Gimp.displays_flush()
-    
+
+    print("Exiting - 'Make Background Transparent' plugin...")
+
     return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
 
 class MakeBackTransPlugin(Gimp.PlugIn):
@@ -91,7 +146,7 @@ class MakeBackTransPlugin(Gimp.PlugIn):
 
     def do_create_procedure(self, name):
         proc = Gimp.ImageProcedure.new(self, name, Gimp.PDBProcType.PLUGIN, self.run, None)
-        proc.set_menu_label("Make Background Transparent")
+        proc.set_menu_label("Make Background Transparent - Test")
         proc.add_menu_path("<Image>/Filters/Development")
         return proc
 
