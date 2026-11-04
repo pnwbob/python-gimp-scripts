@@ -148,7 +148,7 @@ class MakeBackTransPlugin(Gimp.PlugIn):
 
     def do_create_procedure(self, name):
         proc = Gimp.ImageProcedure.new(self, name, Gimp.PDBProcType.PLUGIN, self.run, None)
-        proc.set_menu_label("Make Background Transparent - Test")
+        proc.set_menu_label("Make Background Transparent")
         proc.add_menu_path("<Image>/Filters/Development")
         return proc
 
